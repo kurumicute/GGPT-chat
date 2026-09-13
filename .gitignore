@@ -1,0 +1,30 @@
+# 前端
+node_modules/
+dist/
+
+# 密碼與環境變數
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 使用者上傳檔案
+uploads/
+
+# 資料庫與紀錄
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# 編輯器與系統
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
