@@ -7,6 +7,7 @@ GGPT 是一套以前後端分離架構開發的 AI 對話平台，提供多模�
 > 線上網站：[https://chat.kurumicute.com/](https://chat.kurumicute.com/)
 
 ## 主要功能
+<img width="2164" height="1085" alt="image" src="https://github.com/user-attachments/assets/d6949752-0b8b-485b-8ecc-cc07491c3359" />
 
 ### 使用者功能
 
@@ -29,7 +30,7 @@ GGPT 是一套以前後端分離架構開發的 AI 對話平台，提供多模�
 - 全域聊天室
 
 ### 管理後台
-
+<img width="2167" height="1353" alt="image" src="https://github.com/user-attachments/assets/ab1dfb11-4d72-49e9-93d1-6a94de2b5cf8" />
 - 使用者與帳號管理
 - 對話、訊息、API 請求及 Token 統計
 - 模型使用量與費用分析
