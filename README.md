@@ -108,22 +108,27 @@ git clone https://github.com/USERNAME/ggpt-chat.git
 cd ggpt-chat
 ```
 
-###2. 使用 SQL 結構檔建立 MySQL 資料庫
+### 2. 使用 SQL 結構檔建立 MySQL 資料庫
 
-專案已在 database/schema.sql 提供完整資料庫結構，內容包含 chat_db 資料庫及網站所需的資料表、索引與關聯設定。
+專案已在 [`database/schema.sql`](database/schema.sql) 提供完整資料庫結構，內容包含 `chat_db` 資料庫、網站所需的資料表、索引與關聯設定。
 
 確認 MySQL 服務已啟動後，在專案根目錄執行：
 
+```powershell
 cmd /c "mysql -u root -p < database\schema.sql"
+```
 
-依提示輸入 MySQL 密碼後，系統會自動建立 chat_db 並匯入完整資料表。
+依照提示輸入 MySQL 密碼，系統便會自動建立 `chat_db` 並匯入完整資料表。
 
-匯入完成後可以執行以下指令確認結果：
+匯入完成後，可執行以下指令確認結果：
 
+```powershell
 mysql -u root -p -e "USE chat_db; SHOW TABLES;"
+```
 
 正常情況下應顯示以下資料表：
 
+```text
 admin_users
 chat
 conversation_collaborators
@@ -133,8 +138,9 @@ global_chat_messages
 token_usage
 users
 visitor_events
+```
 
-database/schema.sql 必須包含 CREATE DATABASE IF NOT EXISTS chat_db 與 USE chat_db，因此不需要另外手動建立資料庫。重複執行時會保留既有資料，不會主動刪除資料表。
+`database/schema.sql` 必須包含 `CREATE DATABASE IF NOT EXISTS chat_db` 與 `USE chat_db`，因此不需要另外手動建立資料庫。結構檔中的資料表應使用 `CREATE TABLE IF NOT EXISTS`，如此重複匯入時會保留既有資料，不會主動刪除資料表。
 
 ### 3. 安裝並啟動後端
 
