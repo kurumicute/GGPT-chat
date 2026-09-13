@@ -1,0 +1,9 @@
+Flask
+google-auth
+mysql-connector-python
+openai
+opencc-python-reimplemented
+Pillow
+python-dotenv
+requests
+Werkzeug
