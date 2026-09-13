@@ -131,13 +131,7 @@ python -m venv venv
 venv\Scripts\Activate.ps1
 ```
 
-如果專案已提供 `requirements.txt`：
-
-```powershell
-pip install -r requirements.txt
-```
-
-若尚未建立 `requirements.txt`，可先安裝目前後端使用的主要套件：
+先安裝目前後端使用的主要套件：
 
 ```powershell
 pip install Flask requests mysql-connector-python Werkzeug opencc-python-reimplemented openai google-auth python-dotenv Pillow
