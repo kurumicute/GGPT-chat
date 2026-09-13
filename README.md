@@ -1,44 +1,255 @@
-# vuegpt
+# GGPT 對話平台
 
-This template should help get you started developing with Vue 3 in Vite.
+GGPT 是一套以前後端分離架構開發的 AI 對話平台，提供多模型切換、推理模式、網路搜尋、檔案與圖片輸入、對話分享、共同對話，以及完整的管理後台。
 
-## Recommended IDE Setup
+介面以桌面與行動裝置皆可使用為目標，並針對程式碼顯示、數學公式、響應式排版及前端載入效能進行最佳化。
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+> 線上網站：[https://chat.kurumicute.com/](https://chat.kurumicute.com/)
 
-## Recommended Browser Setup
+## 主要功能
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+### 使用者功能
 
-## Customize configuration
+- 帳號註冊、登入及工作階段管理
+- Google 帳號登入
+- 建立、重新命名及刪除對話
+- 多種 AI 模型切換與推理強度設定
+- 選用網路搜尋功能
+- 圖片、文字檔與程式碼附件輸入
+- Markdown、程式碼語法高亮與 KaTeX 數學公式顯示
+- 對話內容複製與程式碼下載
+- 語音朗讀（TTS）
+- 深色／淺色介面
+- 手機與桌面響應式版面
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+### 協作功能
 
-## Project Setup
+- 產生不可預測的對話分享連結
+- 透過 `/c/:shareToken` 加入共同對話
+- 分享者可隨時停止分享
+- 共同對話定時同步
+- 全域聊天室
 
-```sh
-npm install
+### 管理後台
+
+- 使用者與帳號管理
+- 對話、訊息、API 請求及 Token 統計
+- 模型使用量與費用分析
+- Web Search 使用次數與費用統計
+- 訪客、瀏覽量、來源、裝置、瀏覽器及作業系統分析
+- 管理員操作紀錄
+- CSV 匯出
+
+## 技術架構
+
+| 類別 | 使用技術 |
+| --- | --- |
+| 前端 | Vue 3、Vite、Vue Router、Pinia |
+| 圖表 | Chart.js |
+| 內容顯示 | Marked、DOMPurify、KaTeX、Highlight.js |
+| 後端 | Python、Flask |
+| 資料庫 | MySQL |
+| AI 服務 | OpenAI API |
+| 第三方登入 | Google Identity Services |
+| 圖片處理 | Pillow、WebP |
+
+## 系統需求
+
+開始前請先準備：
+
+- Node.js 20 LTS 或相容版本
+- npm
+- Python 3.10 以上版本
+- MySQL 8.0 或相容版本
+- OpenAI API Key
+- Git
+
+## 環境變數
+
+在後端專案根目錄建立 `.env`：
+
+```dotenv
+# Flask
+FLASK_SECRET_KEY=replace_with_a_long_random_value
+TRAFFIC_SALT=replace_with_another_random_value
+
+# MySQL
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_PASSWORD=replace_with_your_database_password
+DB_NAME=chat_db
+
+# OpenAI
+OPENAI_API_KEY=replace_with_your_openai_api_key
+OPENAI_MODEL=gpt-5.6-luna
+OPENAI_TTS_MODEL=tts-1
+
+# 管理員，格式為 帳號:密碼；多組帳號以逗號分隔
+ADMIN_ACCOUNTS=admin:replace_with_a_strong_password
+
+# Google 登入；不使用時可留空
+GOOGLE_CLIENT_ID=
+
+# 使用限制與上傳設定
+USER_TOKEN_QUOTA=1000000
+MAX_UPLOAD_MB=50
+IMAGE_MAX_DIMENSION=2048
+IMAGE_WEBP_QUALITY=82
+GLOBAL_CHAT_MAX_LENGTH=500
+GLOBAL_CHAT_HISTORY_LIMIT=50
 ```
 
-### Compile and Hot-Reload for Development
+> 請勿將 `.env`、API Key、資料庫密碼、管理員密碼或 Client Secret 提交到 GitHub。建議另外提供不含真實機密資料的 `.env.example`。
 
-```sh
+## 安裝與啟動
+
+### 1. 取得專案
+
+```bash
+git clone https://github.com/USERNAME/ggpt-chat.git
+cd ggpt-chat
+```
+
+請將 `USERNAME` 換成實際的 GitHub 帳號名稱。
+
+### 2. 建立 MySQL 資料庫
+
+登入 MySQL 後建立資料庫：
+
+```sql
+CREATE DATABASE chat_db
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
+```
+
+如果專案附有 SQL 結構檔，請接著將其匯入 `chat_db`。後端啟動時會建立或更新對話分享、Token 統計、訪客統計及全域聊天等部分資料表，但既有的核心使用者與聊天資料表仍需符合後端使用的結構。
+
+### 3. 安裝並啟動後端
+
+進入後端目錄後建立虛擬環境：
+
+```powershell
+python -m venv venv
+venv\Scripts\Activate.ps1
+```
+
+如果專案已提供 `requirements.txt`：
+
+```powershell
+pip install -r requirements.txt
+```
+
+若尚未建立 `requirements.txt`，可先安裝目前後端使用的主要套件：
+
+```powershell
+pip install Flask requests mysql-connector-python Werkzeug opencc-python-reimplemented openai google-auth python-dotenv Pillow
+```
+
+啟動 Flask：
+
+```powershell
+python app.py
+```
+
+預設後端位址：
+
+```text
+http://127.0.0.1:8080
+```
+
+健康檢查：
+
+```text
+http://127.0.0.1:8080/health
+```
+
+### 4. 安裝並啟動前端
+
+開啟另一個 PowerShell 視窗並進入前端目錄：
+
+```powershell
+npm install
 npm run dev
 ```
 
-### Compile and Minify for Production
+預設前端位址：
 
-```sh
+```text
+http://127.0.0.1:5173
+```
+
+Vite 開發伺服器會將登入、聊天、上傳、分享、TTS 與管理 API 請求代理到 `http://127.0.0.1:8080`。
+
+## 正式建置
+
+建立前端正式版本：
+
+```powershell
 npm run build
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+輸出檔案會位於：
 
-```sh
-npm run lint
+```text
+dist/
 ```
+
+需要分析前端打包大小時，先安裝分析工具：
+
+```powershell
+npm install -D rollup-plugin-visualizer
+$env:ANALYZE="true"
+npm run build
+```
+
+分析報告將產生於：
+
+```text
+dist/bundle-report.html
+```
+
+## 主要路由
+
+| 路徑 | 說明 |
+| --- | --- |
+| `/` | 使用者登入與主要對話介面 |
+| `/c/:shareToken` | 共同對話分享連結 |
+| `/admin` | 管理後台 |
+| `/health` | 後端健康檢查 |
+
+## Git 更新流程
+
+修改程式後可使用以下指令更新 GitHub：
+
+```powershell
+git status
+git add .
+git commit -m "說明這次修改的內容"
+git push
+```
+
+建議使用簡短且明確的 Commit 訊息，例如：
+
+```text
+feat: 新增共同對話功能
+fix: 修正手機版輸入區位置
+style: 統一前後台色彩
+docs: 更新中文版 README
+```
+
+## 安全注意事項
+
+- 正式環境必須設定高強度的 `FLASK_SECRET_KEY` 與 `TRAFFIC_SALT`。
+- 不要在程式碼中保留資料庫密碼、API Key 或管理員密碼的預設值。
+- 正式環境應啟用 HTTPS 與安全 Cookie。
+- 對使用者上傳內容進行副檔名、檔案大小及內容檢查。
+- 定期更新前後端相依套件並檢查已知漏洞。
+- 若機密資料曾經提交到公開 GitHub，僅刪除檔案仍不夠，必須立即更換對應密碼或金鑰。
+
+## 專案狀態
+
+目前專案仍持續開發中，功能與資料庫結構可能隨版本調整。正式部署前，請先於測試環境完成登入、聊天、檔案上傳、分享連結及管理後台驗證。
+
+## 授權
+
+目前尚未指定開源授權。未經專案擁有者明確授權，不代表可自由重製、修改或散布本專案程式碼。
