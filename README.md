@@ -98,7 +98,6 @@ GLOBAL_CHAT_MAX_LENGTH=500
 GLOBAL_CHAT_HISTORY_LIMIT=50
 ```
 
-> 請勿將 `.env`、API Key、資料庫密碼、管理員密碼或 Client Secret 提交到 GitHub。建議另外提供不含真實機密資料的 `.env.example`。
 
 ## 安裝與啟動
 
