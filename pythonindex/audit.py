@@ -9,6 +9,7 @@ from logging.handlers import RotatingFileHandler
 from flask import Blueprint, g, request, session
 
 from config import BASE_DIR
+from security import client_ip
 
 
 bp = Blueprint("audit", __name__)
@@ -31,10 +32,7 @@ if not admin_logger.handlers:
     admin_logger.addHandler(handler)
 
 def _admin_client_ip():
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
+    return client_ip()
 
 
 def _admin_safe_request_data():

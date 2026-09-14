@@ -1,9 +1,10 @@
 """全域聊天室 API。"""
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, session
 
 from config import GLOBAL_CHAT_HISTORY_LIMIT, GLOBAL_CHAT_MAX_LENGTH
 from database import get_conn, require_login
+from extensions import limiter
 
 
 bp = Blueprint("global_chat", __name__)
@@ -131,10 +132,11 @@ def global_chat_messages():
             "messages": messages
         })
 
-    except Exception as e:
+    except Exception:
+        current_app.logger.exception("global chat read failed")
         return jsonify({
             "success": False,
-            "error": f"讀取全域聊天室失敗：{e}"
+            "error": "讀取全域聊天室失敗，請稍後再試。"
         }), 500
 
     finally:
@@ -145,6 +147,7 @@ def global_chat_messages():
 
 
 @bp.route("/api/global_chat/messages", methods=["POST"])
+@limiter.limit("20 per minute")
 def global_chat_send():
     user_id = require_login()
 
@@ -277,14 +280,14 @@ def global_chat_send():
             }
         })
 
-    except Exception as e:
+    except Exception:
         if conn:
             conn.rollback()
+        current_app.logger.exception("global chat send failed")
 
         return jsonify({
             "success": False,
-            "error":
-                f"發送全域訊息失敗：{e}"
+            "error": "發送全域訊息失敗，請稍後再試。"
         }), 500
 
     finally:

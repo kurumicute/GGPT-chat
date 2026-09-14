@@ -1,11 +1,21 @@
 """管理員驗證、儀表板、訪客分析與使用者管理 API。"""
 
 import mysql.connector
-from flask import Blueprint, jsonify, render_template, request, session
-from werkzeug.security import check_password_hash, generate_password_hash
+from flask import Blueprint, current_app, jsonify, render_template, request, session
 
 from config import WEB_SEARCH_PRICE_PER_RUN
 from database import get_conn
+from extensions import limiter
+from security import (
+    DUMMY_PASSWORD_HASH,
+    constant_time_password_check,
+    hash_password,
+    normalize_username,
+    validate_credentials,
+    validate_email,
+    validate_password,
+    validate_username,
+)
 
 
 bp = Blueprint("admin", __name__)
@@ -44,8 +54,11 @@ def admin_index_legacy():
 
 
 @bp.route("/api/admin/login", methods=["POST"])
+@limiter.limit("5 per minute; 20 per hour")
 def admin_login():
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return admin_error("請求格式不正確。", 400)
     username = str(data.get("username") or "").strip()
     password = str(data.get("password") or "")
 
@@ -63,10 +76,9 @@ def admin_login():
         """, (username,))
         admin = cur.fetchone()
 
-        if not admin or not bool(admin.get("is_active")):
-            return admin_error("管理員帳號或密碼錯誤。", 401)
-
-        if not check_password_hash(admin["password_hash"], password):
+        stored_hash = admin["password_hash"] if admin else DUMMY_PASSWORD_HASH
+        password_ok = constant_time_password_check(stored_hash, password)
+        if not admin or not bool(admin.get("is_active")) or not password_ok:
             return admin_error("管理員帳號或密碼錯誤。", 401)
 
         cur.execute(
@@ -75,14 +87,17 @@ def admin_login():
         )
         conn.commit()
 
+        session.clear()
+        session.permanent = True
         session["is_admin"] = True
         session["admin_username"] = admin["username"]
         session["admin_id"] = int(admin["id"])
 
         return jsonify({"success": True, "username": admin["username"]})
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return admin_error(f"管理員登入失敗：{e}", 500)
+        current_app.logger.exception("admin login failed")
+        return admin_error("管理員登入暫時失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()
@@ -93,11 +108,9 @@ def admin_check():
     return jsonify({"logged_in": require_admin(), "username": session.get("admin_username")})
 
 
-@bp.route("/api/admin/logout")
+@bp.route("/api/admin/logout", methods=["POST"])
 def admin_logout():
-    session.pop("is_admin", None)
-    session.pop("admin_username", None)
-    session.pop("admin_id", None)
+    session.clear()
     return jsonify({"success": True})
 
 
@@ -280,8 +293,9 @@ def admin_dashboard():
             "total_cost": float(overall.get("total_cost") or 0),
             "web_search_price_per_run": WEB_SEARCH_PRICE_PER_RUN
         })
-    except Exception as e:
-        return admin_error(f"讀取管理統計失敗：{e}", 500)
+    except Exception:
+        current_app.logger.exception("admin dashboard failed")
+        return admin_error("讀取管理統計失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()
@@ -403,8 +417,9 @@ def admin_traffic():
             "sources": [norm(x) for x in sources],
             "recent": [norm(x) for x in recent]
         })
-    except Exception as e:
-        return admin_error(f"讀取訪客流量失敗：{e}", 500)
+    except Exception:
+        current_app.logger.exception("admin traffic failed")
+        return admin_error("讀取訪客流量失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()
@@ -416,17 +431,17 @@ def admin_create_user():
         return admin_error("沒有管理員權限。", 403)
 
     data = request.get_json(silent=True) or {}
-    username = str(data.get("username") or "").strip()
-    password = str(data.get("password") or "")
+    if not isinstance(data, dict):
+        return admin_error("請求格式不正確。", 400)
+    password = data.get("password")
+    username, validation_error = validate_credentials(data.get("username"), password)
     display_name = str(data.get("display_name") or username).strip()[:255]
-    email = str(data.get("email") or "").strip().lower()[:320]
+    email, email_error = validate_email(data.get("email"))
 
-    if not username or not password:
-        return admin_error("帳號與密碼都不能為空。", 400)
-    if len(username) > 100:
-        return admin_error("帳號最多 100 個字元。", 400)
-    if len(password) < 4:
-        return admin_error("密碼至少需要 4 個字元。", 400)
+    if validation_error:
+        return admin_error(validation_error, 400)
+    if email_error:
+        return admin_error(email_error, 400)
 
     conn = get_conn()
     cur = conn.cursor()
@@ -435,7 +450,7 @@ def admin_create_user():
             INSERT INTO users
             (username,password_hash,email,display_name,auth_provider)
             VALUES (%s,%s,%s,%s,%s)
-        """, (username, generate_password_hash(password), email or None,
+        """, (username, hash_password(password), email,
               display_name or username, "local"))
         user_id = cur.lastrowid
         conn.commit()
@@ -443,9 +458,10 @@ def admin_create_user():
     except mysql.connector.IntegrityError:
         conn.rollback()
         return admin_error("帳號已存在，請換一個帳號。", 400)
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return admin_error(f"新增使用者失敗：{e}", 500)
+        current_app.logger.exception("admin create user failed")
+        return admin_error("新增使用者失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()
@@ -457,15 +473,23 @@ def admin_update_user(user_id):
         return admin_error("沒有管理員權限。", 403)
 
     data = request.get_json(silent=True) or {}
-    username = str(data.get("username") or "").strip()
-    password = str(data.get("password") or "")
+    if not isinstance(data, dict):
+        return admin_error("請求格式不正確。", 400)
+    username = normalize_username(data.get("username"))
+    password = data.get("password")
     display_name = str(data.get("display_name") or "").strip()[:255]
-    email = str(data.get("email") or "").strip().lower()[:320]
+    email, email_error = validate_email(data.get("email"))
 
-    if username and len(username) > 100:
-        return admin_error("帳號最多 100 個字元。", 400)
-    if password and len(password) < 4:
-        return admin_error("新密碼至少需要 4 個字元。", 400)
+    if username:
+        username, username_error = validate_username(username)
+        if username_error:
+            return admin_error(username_error, 400)
+    if password is not None and password != "":
+        password_error = validate_password(password, username)
+        if password_error:
+            return admin_error(password_error, 400)
+    if email_error:
+        return admin_error(email_error, 400)
 
     conn = get_conn()
     cur = conn.cursor(dictionary=True)
@@ -478,15 +502,15 @@ def admin_update_user(user_id):
         if username:
             updates.append("username=%s")
             values.append(username)
-        if password:
+        if password is not None and password != "":
             updates.append("password_hash=%s")
-            values.append(generate_password_hash(password))
+            values.append(hash_password(password))
         if display_name:
             updates.append("display_name=%s")
             values.append(display_name)
         if "email" in data:
             updates.append("email=%s")
-            values.append(email or None)
+            values.append(email)
 
         if not updates:
             return admin_error("沒有提供任何要修改的欄位。", 400)
@@ -498,9 +522,10 @@ def admin_update_user(user_id):
     except mysql.connector.IntegrityError:
         conn.rollback()
         return admin_error("帳號已被其他使用者使用。", 400)
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return admin_error(f"修改使用者失敗：{e}", 500)
+        current_app.logger.exception("admin update user failed")
+        return admin_error("修改使用者失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()
@@ -547,9 +572,10 @@ def admin_delete_user(user_id):
         cur.execute("DELETE FROM users WHERE id=%s", (user_id,))
         conn.commit()
         return jsonify({"success": True})
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return admin_error(f"刪除使用者失敗：{e}", 500)
+        current_app.logger.exception("admin delete user failed")
+        return admin_error("刪除使用者失敗，請稍後再試。", 500)
     finally:
         cur.close()
         conn.close()

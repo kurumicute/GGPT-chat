@@ -3,30 +3,49 @@
 import io
 import json
 import os
+from urllib.parse import urlsplit
 
 import requests
-from flask import Blueprint, abort, jsonify, request, send_file
+from flask import Blueprint, abort, current_app, jsonify, request, send_file
 
 from config import (
+    CHAT_MAX_ATTACHMENTS,
+    CHAT_MESSAGE_MAX_LENGTH,
     MODEL_PRICING,
     OPENAI_API_KEY,
+    OPENAI_MAX_OUTPUT_TOKENS,
     TOKEN_QUOTA,
     WEB_SEARCH_PRICE_PER_1K,
     WEB_SEARCH_PRICE_PER_RUN,
 )
 from database import accessible_conversation, ensure_user_has_conversation, get_conn, require_login
-from extensions import openai_client as client, traditional_chinese as cc
+from extensions import limiter, openai_client as client, traditional_chinese as cc
 from pricing import calculate_model_cost, calculate_web_search_cost, get_model_pricing
 
 
 bp = Blueprint("ai", __name__)
+
+
+def normalize_local_upload_url(value):
+    """附件只能引用本站 /uploads/ 下的檔案，避免由前端任意指定外部資源。"""
+    value = str(value or "").strip()
+    if not value:
+        return ""
+    parsed = urlsplit(value)
+    if parsed.scheme or parsed.netloc or parsed.query or parsed.fragment:
+        return ""
+    if not parsed.path.startswith("/uploads/") or ".." in parsed.path:
+        return ""
+    return parsed.path[:1024]
 
 def normalize_attachment(attachment):
     if not isinstance(attachment, dict):
         return None
     name = str(attachment.get("name") or "附件")[:255]
     mime_type = str(attachment.get("mime_type") or "application/octet-stream")[:255]
-    url = str(attachment.get("url") or attachment.get("file_url") or "")[:1024]
+    url = normalize_local_upload_url(
+        attachment.get("url") or attachment.get("file_url") or ""
+    )
     content = attachment.get("content")
     if content is not None:
         content = str(content)[:200000]
@@ -105,15 +124,21 @@ def extract_reasoning_summary(response):
 
 
 @bp.route("/chat", methods=["POST"])
+@limiter.limit("20 per minute")
 def chat():
     user_id = require_login()
     if user_id is None:
         return jsonify({"error": "請先登入！"}), 401
 
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "請求格式不正確。"}), 400
     conversation_id = data.get("conversation_id")
-    user_message = (data.get("message") or "").strip()
-    image_url = data.get("image_url")
+    user_message = str(data.get("message") or "").strip()
+    image_url = normalize_local_upload_url(data.get("image_url"))
+
+    if len(user_message) > CHAT_MESSAGE_MAX_LENGTH:
+        return jsonify({"error": f"單次訊息最多 {CHAT_MESSAGE_MAX_LENGTH} 個字元。"}), 400
 
     requested_model = (data.get("model") or os.getenv("OPENAI_MODEL") or "gpt-5.6-luna").strip()
     if requested_model not in MODEL_PRICING:
@@ -151,16 +176,22 @@ def chat():
     raw_attachments = data.get("attachments") or []
     if not isinstance(raw_attachments, list):
         return jsonify({"error": "attachments 必須是陣列。"}), 400
+    if len(raw_attachments) > CHAT_MAX_ATTACHMENTS:
+        return jsonify({"error": f"單次最多附加 {CHAT_MAX_ATTACHMENTS} 個檔案。"}), 400
 
     attachments = [x for x in (normalize_attachment(a) for a in raw_attachments) if x]
 
     if not conversation_id:
         conversation_id = ensure_user_has_conversation(user_id)
+    try:
+        conversation_id = int(conversation_id)
+    except (TypeError, ValueError):
+        return jsonify({"error": "對話編號格式不正確。"}), 400
 
     conn = get_conn()
     cur = conn.cursor(dictionary=True)
     try:
-        conv = accessible_conversation(cur, user_id, int(conversation_id))
+        conv = accessible_conversation(cur, user_id, conversation_id)
         if not conv:
             return jsonify({"error": "對話不存在，或你沒有這個共享對話的權限。"}), 404
 
@@ -230,7 +261,7 @@ def chat():
                 "如果使用者提供附件內容，請直接根據附件內容回答，不要假裝看過不存在的內容。"
             ),
             "input": input_messages,
-            "max_output_tokens": 100000,
+            "max_output_tokens": OPENAI_MAX_OUTPUT_TOKENS,
         }
 
         if reasoning_enabled and reasoning_effort:
@@ -402,9 +433,10 @@ def chat():
                 "is_shared": 0 if conv.get("is_owner") else 1
             }
         })
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return jsonify({"error": str(e)}), 500
+        current_app.logger.exception("chat request failed")
+        return jsonify({"error": "AI 回覆暫時失敗，請稍後再試。"}), 500
     finally:
         cur.close()
         conn.close()
@@ -531,8 +563,9 @@ def usage():
                 "price_per_run": WEB_SEARCH_PRICE_PER_RUN
             }
         })
-    except Exception as e:
-        return jsonify({"error": f"讀取 Token 統計失敗：{e}"}), 500
+    except Exception:
+        current_app.logger.exception("usage query failed")
+        return jsonify({"error": "讀取 Token 統計失敗，請稍後再試。"}), 500
     finally:
         cur.close()
         conn.close()
@@ -540,7 +573,10 @@ def usage():
 
 # ---------- TTS ----------
 @bp.route("/tts")
+@limiter.limit("10 per minute")
 def tts():
+    if require_login() is None:
+        return jsonify({"error": "請先登入！"}), 401
     text = request.args.get("text", "").strip()
     if not text:
         abort(400, "缺少 text")

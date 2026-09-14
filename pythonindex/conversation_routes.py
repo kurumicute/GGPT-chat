@@ -3,7 +3,7 @@
 import json
 import uuid
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from database import (
     accessible_conversation,
@@ -12,6 +12,7 @@ from database import (
     owned_conversation,
     require_login,
 )
+from extensions import limiter
 
 
 bp = Blueprint("conversations", __name__)
@@ -85,6 +86,7 @@ def create_conversation():
 
 
 @bp.route("/conversations/<int:conversation_id>/share", methods=["POST"])
+@limiter.limit("10 per minute")
 def share_conversation(conversation_id):
     user_id = require_login()
     if user_id is None:
@@ -128,9 +130,10 @@ def share_conversation(conversation_id):
             "share_token": share_token,
             "share_path": f"/c/{share_token}",
         })
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return jsonify({"error": f"建立分享連結失敗：{e}"}), 500
+        current_app.logger.exception("conversation share failed")
+        return jsonify({"error": "建立分享連結失敗，請稍後再試。"}), 500
     finally:
         cur.close()
         conn.close()
@@ -159,15 +162,17 @@ def revoke_conversation_share(conversation_id):
         )
         conn.commit()
         return jsonify({"success": True})
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return jsonify({"error": f"停止分享失敗：{e}"}), 500
+        current_app.logger.exception("conversation revoke failed")
+        return jsonify({"error": "停止分享失敗，請稍後再試。"}), 500
     finally:
         cur.close()
         conn.close()
 
 
 @bp.route("/shared-conversations/<share_token>/join", methods=["POST"])
+@limiter.limit("20 per minute")
 def join_shared_conversation(share_token):
     user_id = require_login()
     if user_id is None:
@@ -211,9 +216,10 @@ def join_shared_conversation(share_token):
         conversation["is_shared"] = 0 if is_owner else 1
         conversation["share_enabled"] = 1
         return jsonify({"success": True, "conversation": conversation})
-    except Exception as e:
+    except Exception:
         conn.rollback()
-        return jsonify({"error": f"加入共享對話失敗：{e}"}), 500
+        current_app.logger.exception("conversation join failed")
+        return jsonify({"error": "加入共享對話失敗，請稍後再試。"}), 500
     finally:
         cur.close()
         conn.close()

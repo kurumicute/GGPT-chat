@@ -2,9 +2,9 @@
 
 import mysql.connector
 from flask import session
-from werkzeug.security import generate_password_hash
 
 from config import ADMIN_ACCOUNTS, ADMIN_PASSWORD, ADMIN_USERNAME, DB_CONFIG, WEB_SEARCH_PRICE_PER_RUN
+from security import hash_password, validate_password
 
 def get_conn():
     return mysql.connector.connect(**DB_CONFIG)
@@ -37,6 +37,9 @@ def _configured_admin_accounts():
     # 同一個 username 只保留最後一組設定。
     deduped = {}
     for username, password in accounts:
+        password_error = validate_password(password, username)
+        if password_error:
+            raise RuntimeError(f"管理員 {username} 的密碼不安全：{password_error}")
         deduped[username] = password
     return list(deduped.items())
 
@@ -68,7 +71,7 @@ def ensure_admin_schema(conn, cur):
                 INSERT INTO admin_users (username, password_hash, is_active)
                 VALUES (%s, %s, 1)
                 """,
-                (username, generate_password_hash(password)),
+                (username, hash_password(password)),
             )
 
     conn.commit()

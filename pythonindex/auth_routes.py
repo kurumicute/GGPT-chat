@@ -3,27 +3,36 @@
 import uuid
 
 import mysql.connector
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, session
 from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import generate_password_hash
 
-from config import GOOGLE_CLIENT_ID
+from config import GOOGLE_CLIENT_ID, PASSWORD_MAX_LENGTH
 from database import ensure_user_has_conversation, get_conn
+from extensions import limiter
+from security import (
+    DUMMY_PASSWORD_HASH,
+    constant_time_password_check,
+    hash_password,
+    normalize_username,
+    validate_credentials,
+)
 
 
 bp = Blueprint("auth", __name__)
 
 @bp.route("/register", methods=["POST"])
+@limiter.limit("5 per 10 minutes")
 def register():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
+    if not isinstance(data, dict):
+        return jsonify({"error": "請求格式不正確。"}), 400
+    password = data.get("password")
+    username, validation_error = validate_credentials(data.get("username"), password)
 
-    if not username or not password:
-        return jsonify({"error": "需要帳號和密碼！"}), 400
-    if len(username) > 100 or len(password) < 4:
-        return jsonify({"error": "帳號長度或密碼不符合要求。"}), 400
+    if validation_error:
+        return jsonify({"error": validation_error}), 400
 
     conn = None
     cur = None
@@ -32,14 +41,15 @@ def register():
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO users (username,password_hash,display_name,auth_provider) VALUES (%s,%s,%s,%s)",
-            (username, generate_password_hash(password), username, "local"),
+            (username, hash_password(password), username, "local"),
         )
         conn.commit()
         return jsonify({"success": True})
     except mysql.connector.IntegrityError:
-        return jsonify({"error": "帳號已存在！"}), 400
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "此帳號無法使用，請換一個帳號。"}), 409
+    except Exception:
+        current_app.logger.exception("register failed")
+        return jsonify({"error": "註冊暫時失敗，請稍後再試。"}), 500
     finally:
         if cur:
             cur.close()
@@ -48,28 +58,42 @@ def register():
 
 
 @bp.route("/login", methods=["POST"])
+@limiter.limit("10 per minute; 50 per hour")
 def login():
     data = request.get_json(silent=True) or {}
-    username = (data.get("username") or "").strip()
-    password = data.get("password") or ""
+    if not isinstance(data, dict):
+        return jsonify({"error": "帳號或密碼錯誤！"}), 401
+    username = normalize_username(data.get("username"))
+    password = data.get("password")
+
+    if not username or not isinstance(password, str) or len(password) > PASSWORD_MAX_LENGTH:
+        # 維持相同回應，避免協助判斷帳號是否存在。
+        constant_time_password_check(DUMMY_PASSWORD_HASH, str(password or ""))
+        return jsonify({"error": "帳號或密碼錯誤！"}), 401
 
     conn = None
     cur = None
     try:
         conn = get_conn()
         cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT * FROM users WHERE username=%s", (username,))
+        cur.execute(
+            "SELECT id,username,password_hash FROM users WHERE username=%s LIMIT 1",
+            (username,),
+        )
         user = cur.fetchone()
-        if not user or not check_password_hash(user["password_hash"], password):
+        stored_hash = user["password_hash"] if user else DUMMY_PASSWORD_HASH
+        if not constant_time_password_check(stored_hash, password) or not user:
             return jsonify({"error": "帳號或密碼錯誤！"}), 401
 
         session.clear()
+        session.permanent = True
         session["user_id"] = user["id"]
         session["username"] = user["username"]
         ensure_user_has_conversation(user["id"])
         return jsonify({"success": True, "username": user["username"]})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        current_app.logger.exception("login failed")
+        return jsonify({"error": "登入暫時失敗，請稍後再試。"}), 500
     finally:
         if cur:
             cur.close()
@@ -132,11 +156,14 @@ def make_google_username(cur, google_sub, email):
 
 
 @bp.route("/auth/google", methods=["POST"])
+@limiter.limit("10 per minute")
 def google_login():
     if not GOOGLE_CLIENT_ID:
         return jsonify({"error": "Google 登入尚未在伺服器設定 GOOGLE_CLIENT_ID。"}), 503
 
     data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify({"error": "請求格式不正確。"}), 400
     credential = (data.get("credential") or "").strip()
     if not credential:
         return jsonify({"error": "缺少 Google ID Token。"}), 400
@@ -219,6 +246,7 @@ def google_login():
 
             conn.commit()
             session.clear()
+            session.permanent = True
             session["user_id"] = user["id"]
             session["username"] = user["username"]
             ensure_user_has_conversation(user["id"])
@@ -237,11 +265,12 @@ def google_login():
 
     except ValueError:
         return jsonify({"error": "Google ID Token 無效、已過期或 audience 不符合目前網站。"}), 401
-    except Exception as e:
-        return jsonify({"error": f"Google 登入驗證失敗：{e}"}), 500
+    except Exception:
+        current_app.logger.exception("google login failed")
+        return jsonify({"error": "Google 登入暫時失敗，請稍後再試。"}), 500
 
 
-@bp.route("/logout")
+@bp.route("/logout", methods=["POST"])
 def logout():
     session.clear()
     return jsonify({"success": True})

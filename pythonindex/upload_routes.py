@@ -14,11 +14,13 @@ from config import (
     IMAGE_WEBP_QUALITY,
 )
 from database import require_login
+from extensions import limiter
 
 Image = None
 ImageOps = None
 try:
     from PIL import Image, ImageOps
+    Image.MAX_IMAGE_PIXELS = 40_000_000
 except ImportError:
     pass
 
@@ -42,6 +44,10 @@ def allowed_attachment_file(filename):
     lower_name = raw.lower()
     safe_lower = safe.lower()
 
+    # 避免使用者不小心把真正的環境變數與金鑰檔上傳成公開附件。
+    if lower_name == ".env" or lower_name.endswith((".pem", ".key", ".p12", ".pfx")):
+        return False
+
     # 支援無副檔名的特殊開發檔案。
     if lower_name in ALLOWED_SPECIAL_FILENAMES or safe_lower in ALLOWED_SPECIAL_FILENAMES:
         return True
@@ -64,35 +70,40 @@ def store_upload(file, safe_name, kind):
     """儲存上傳內容；一般靜態圖片會縮圖並轉為 WebP。"""
     extension = safe_name.rsplit(".", 1)[1].lower() if "." in safe_name else ""
 
-    if kind == "image" and Image is not None and extension in {
-        "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"
-    }:
+    if kind == "image":
+        if Image is None:
+            raise ValueError("伺服器缺少圖片驗證元件。")
+
+        # 先解碼與驗證實際內容，不能只相信副檔名或瀏覽器提供的 MIME。
         try:
             file.stream.seek(0)
+            with Image.open(file.stream) as probe:
+                probe.verify()
+            file.stream.seek(0)
             with Image.open(file.stream) as source:
-                # 動圖保持原格式，避免只保留第一幀。
-                if getattr(source, "is_animated", False):
-                    raise ValueError("animated image")
+                if not getattr(source, "is_animated", False) and extension in {
+                    "png", "jpg", "jpeg", "webp", "bmp", "tif", "tiff"
+                }:
+                    image = ImageOps.exif_transpose(source)
+                    image.thumbnail(
+                        (IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION),
+                        Image.Resampling.LANCZOS
+                    )
+                    if image.mode not in {"RGB", "RGBA"}:
+                        image = image.convert("RGBA" if "transparency" in image.info else "RGB")
 
-                image = ImageOps.exif_transpose(source)
-                image.thumbnail(
-                    (IMAGE_MAX_DIMENSION, IMAGE_MAX_DIMENSION),
-                    Image.Resampling.LANCZOS
-                )
-                if image.mode not in {"RGB", "RGBA"}:
-                    image = image.convert("RGBA" if "transparency" in image.info else "RGB")
-
-                optimized_name = f"{uuid.uuid4().hex}.webp"
-                optimized_path = os.path.join(current_app.config["UPLOAD_FOLDER"], optimized_name)
-                image.save(
-                    optimized_path,
-                    "WEBP",
-                    quality=IMAGE_WEBP_QUALITY,
-                    method=6
-                )
-                return optimized_name, optimized_path, "image/webp"
-        except Exception:
-            # Pillow 未支援的格式或壓縮失敗時保留原檔，不中斷使用者上傳。
+                    optimized_name = f"{uuid.uuid4().hex}.webp"
+                    optimized_path = os.path.join(current_app.config["UPLOAD_FOLDER"], optimized_name)
+                    image.save(
+                        optimized_path,
+                        "WEBP",
+                        quality=IMAGE_WEBP_QUALITY,
+                        method=6
+                    )
+                    return optimized_name, optimized_path, "image/webp"
+        except Exception as exc:
+            raise ValueError("圖片內容無效或尺寸過大。") from exc
+        finally:
             file.stream.seek(0)
 
     stored_name = build_upload_name(safe_name)
@@ -116,6 +127,7 @@ def read_text_file(path):
 
 
 @bp.route("/upload", methods=["POST"])
+@limiter.limit("20 per minute")
 def upload():
     """統一的圖片 / 一般檔案上傳 API。支援一次上傳多個檔案。"""
     if require_login() is None:
@@ -150,7 +162,10 @@ def upload():
                 }), 400
             kind = "file"
 
-        unique_filename, path, stored_mime_type = store_upload(file, safe_name, kind)
+        try:
+            unique_filename, path, stored_mime_type = store_upload(file, safe_name, kind)
+        except ValueError as exc:
+            return jsonify({"success": False, "error": str(exc)}), 400
 
         size = os.path.getsize(path)
         content = None
@@ -194,6 +209,7 @@ def upload():
 
 # 舊版 API 保留，避免既有前端 / 書籤暫時壞掉；實際上都轉送到同一個處理邏輯。
 @bp.route("/upload_image", methods=["POST"])
+@limiter.limit("20 per minute")
 def upload_image_legacy():
     if require_login() is None:
         return jsonify({"success": False, "error": "請先登入！"}), 401
@@ -202,11 +218,14 @@ def upload_image_legacy():
     if not file or not file.filename:
         return jsonify({"success": False, "error": "沒有圖片檔案"}), 400
 
-    if not allowed_image_file(file.filename) and not (file.mimetype or "").startswith("image/"):
+    if not allowed_image_file(file.filename):
         return jsonify({"success": False, "error": "不支援的圖片格式"}), 400
 
     original_name, safe_name = _normalized_filename(file.filename)
-    unique_filename, path, stored_mime_type = store_upload(file, safe_name, "image")
+    try:
+        unique_filename, path, stored_mime_type = store_upload(file, safe_name, "image")
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
     return jsonify({
         "success": True,
         "image_url": f"/uploads/{unique_filename}",
@@ -217,6 +236,7 @@ def upload_image_legacy():
 
 
 @bp.route("/upload_file", methods=["POST"])
+@limiter.limit("20 per minute")
 def upload_file_legacy():
     if require_login() is None:
         return jsonify({"success": False, "error": "請先登入！"}), 401
@@ -250,12 +270,20 @@ def upload_file_legacy():
 
 @bp.route("/uploads/<path:filename>")
 def uploaded_file(filename):
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    inline_image = extension in ALLOWED_IMAGE_EXTENSIONS
     response = send_from_directory(
         current_app.config["UPLOAD_FOLDER"],
         filename,
+        as_attachment=not inline_image,
         conditional=True,
         max_age=31536000
     )
     # 檔名含 UUID，內容更新時 URL 也會改變，因此可安全長期快取。
     response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
+    if not inline_image:
+        response.headers["Content-Type"] = "application/octet-stream"
     return response

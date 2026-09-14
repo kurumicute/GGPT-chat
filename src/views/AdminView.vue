@@ -892,6 +892,16 @@ async function saveUser() {
   loading.value = true
 
   try {
+    const normalizedUsername = form.value.username.normalize('NFKC').trim()
+    if (normalizedUsername.length < 3 || normalizedUsername.length > 32) {
+      throw new Error('帳號長度需為 3～32 個字元')
+    }
+    if ((!editingUser.value || form.value.password) &&
+        (form.value.password.length < 8 || form.value.password.length > 128)) {
+      throw new Error('密碼長度需為 8～128 個字元')
+    }
+    form.value.username = normalizedUsername
+
     if (
       editingUser.value
     ) {
@@ -3447,7 +3457,8 @@ onUnmounted(() => {
             v-model="
               form.username
             "
-            maxlength="100"
+            minlength="3"
+            maxlength="32"
             placeholder="登入帳號"
             required
           />
@@ -3461,7 +3472,8 @@ onUnmounted(() => {
               form.password
             "
             type="password"
-            minlength="4"
+            minlength="8"
+            maxlength="128"
             :required="
               !editingUser
             "

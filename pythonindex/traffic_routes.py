@@ -7,15 +7,13 @@ from flask import Blueprint, jsonify, request
 
 from config import TRACKED_TRAFFIC_PATHS, TRAFFIC_SALT
 from database import get_conn
+from security import client_ip
 
 
 bp = Blueprint("traffic", __name__)
 
 def _request_client_ip():
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.remote_addr or "unknown"
+    return client_ip()
 
 
 def _visitor_hash():

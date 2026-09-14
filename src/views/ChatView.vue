@@ -23,6 +23,51 @@ const username = ref('')
 const password = ref('')
 const accountName = ref('')
 
+const COMMON_USERNAMES = new Set([
+  'admin', 'administrator', 'root', 'system', 'user', 'username',
+  'test', 'tester', 'demo', 'guest', 'support', 'webmaster',
+  '管理員', '系統', '測試', '訪客'
+])
+const COMMON_PASSWORDS = new Set([
+  '12345678', '123456789', '1234567890', '00000000', '11111111',
+  'password', 'password1', 'passw0rd', 'qwerty123', 'qwertyuiop',
+  'abc12345', 'admin123', 'administrator', 'iloveyou', 'letmein',
+  'welcome1', 'changeme', 'test1234', 'user1234'
+])
+
+function registrationValidationError() {
+  const account = username.value.normalize('NFKC').trim()
+  const secret = password.value
+
+  if (account.length < 3 || account.length > 32) {
+    return '帳號長度需為 3～32 個字元'
+  }
+  if (!/^[\p{L}\p{N}_.-]+$/u.test(account) ||
+      !/^[\p{L}\p{N}]/u.test(account) ||
+      !/[\p{L}\p{N}]$/u.test(account)) {
+    return '帳號只能使用中英文字、數字、底線、句點與連字號，且開頭結尾須為文字或數字'
+  }
+  if (COMMON_USERNAMES.has(account.toLowerCase())) {
+    return '此帳號過於常見，請換一個較不容易猜到的帳號'
+  }
+  if (secret.length < 8 || secret.length > 128) {
+    return '密碼長度需為 8～128 個字元'
+  }
+  const simplifiedSecret = secret.toLowerCase().replace(/[^a-z0-9]/g, '')
+  const simplifiedAccount = account.toLowerCase().replace(/[^a-z0-9]/g, '')
+  if (COMMON_PASSWORDS.has(secret.toLowerCase()) ||
+      COMMON_PASSWORDS.has(simplifiedSecret)) {
+    return '這組密碼太常見，請換一組較不容易猜到的密碼'
+  }
+  if (simplifiedSecret && simplifiedSecret === simplifiedAccount) {
+    return '密碼不能與帳號相同'
+  }
+  if (new Set(secret).size === 1) {
+    return '密碼不能全部使用相同字元'
+  }
+  return ''
+}
+
 // 這些集合都以整批資料更新；shallowRef 可避免數百筆內容被深層 Proxy 化。
 const conversations = shallowRef([])
 const currentConversationId = ref(null)
@@ -853,6 +898,12 @@ async function register() {
     return
   }
 
+  const validationError = registrationValidationError()
+  if (validationError) {
+    errorMessage.value = validationError
+    return
+  }
+
   loading.value = true
   errorMessage.value = ''
 
@@ -881,7 +932,7 @@ async function register() {
 
 async function logout() {
   try {
-    await api('/logout')
+    await api('/logout', { method: 'POST' })
   } catch {
     // ignore
   }
@@ -2134,6 +2185,11 @@ onUnmounted(() => {
             v-model="username"
             placeholder="輸入帳號"
             autocomplete="username"
+            minlength="3"
+            maxlength="32"
+            autocapitalize="none"
+            spellcheck="false"
+            required
           />
         </div>
 
@@ -2146,6 +2202,9 @@ onUnmounted(() => {
             type="password"
             placeholder="輸入密碼"
             autocomplete="current-password"
+            minlength="8"
+            maxlength="128"
+            required
           />
         </div>
 
@@ -3748,6 +3807,7 @@ onUnmounted(() => {
 .auth-field:focus-within { border-color:#64666d; }
 .auth-field span { color:#686a72; font-size:10px; }
 .auth-field input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:#ececf1; font-size:14px; }
+.auth-rule-hint { display:block; margin-top:8px; color:#777983; font-size:11px; line-height:1.5; }
 .primary, .secondary {
   width:100%; height:44px;
   border-radius:10px;
