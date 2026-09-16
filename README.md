@@ -114,7 +114,7 @@ cd ggpt-chat
 
 確認 MySQL 服務已啟動後，在專案根目錄執行：
 
-cmd /c "mysql -u root -p < database\schema.sql"
+mysql -u root -p < database\schema.sql
 
 依提示輸入 MySQL 密碼後，系統會自動建立 chat_db 並匯入完整資料表。
 
