@@ -4139,6 +4139,136 @@ onUnmounted(() => {
   .welcome h1 { font-size: 29px !important; }
 }
 
+
+/* ===== LIGHT THEME FIXES: controls that were still using dark-mode hardcoded colors ===== */
+.light .sidebar-bottom {
+  background: var(--panel);
+  border-top-color: #e6e8ed;
+}
+
+.light .new-chat {
+  border-color: #dfe3e7;
+  background: #ffffff;
+}
+
+.light .new-chat:hover {
+  border-color: #cfd4da;
+  background: #f3f4f6;
+}
+
+.light .new-chat kbd {
+  border-color: #d7dbe1;
+  background: #f1f3f5;
+  color: #656b74;
+  box-shadow: inset 0 -1px 0 rgba(20, 24, 30, .05);
+}
+
+.light .account {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.light .account-avatar {
+  border-color: #d9dde3;
+  background: #eef0f3;
+  color: #30343b;
+}
+
+.light .side-tool:hover,
+.light .logout:hover {
+  background: #f0f1f3;
+}
+
+.light .model-button {
+  border-color: #dde1e7;
+  background: #f3f4f6;
+  color: #454a54;
+}
+
+.light .model-button:hover {
+  border-color: #cfd4da;
+  background: #e9ecef;
+}
+
+.light .tool-button {
+  background: #f3f4f6;
+  color: #6f7680;
+}
+
+.light .tool-button:hover {
+  background: #e9ecef;
+  color: var(--text);
+}
+
+/* 共同聊天：外面的按鈕與裡面的面板都要跟著淺色主題切換 */
+.light .global-chat-toggle {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .97);
+  color: #25282e;
+  box-shadow: 0 10px 28px rgba(18, 25, 35, .12);
+}
+
+.light .global-chat-toggle:hover {
+  background: #f3f4f6;
+}
+
+.light .global-chat-toggle b {
+  background: #eceff2;
+  color: #454a54;
+}
+
+.light .global-chat-panel {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .985);
+  color: #1f2329;
+  box-shadow: 0 24px 70px rgba(18, 25, 35, .16);
+}
+
+.light .global-chat-head {
+  border-bottom-color: #e5e8ec;
+}
+
+.light .global-chat-message {
+  border-color: #e1e4e9;
+  background: #f6f7f9;
+  color: #23262c;
+}
+
+.light .global-chat-meta span,
+.light .global-chat-empty {
+  color: #737983;
+  opacity: 1;
+}
+
+.light .global-chat-error {
+  border-top-color: #e5e8ec;
+}
+
+.light .global-chat-input {
+  border-top-color: #e5e8ec;
+  background: #ffffff;
+}
+
+.light .global-chat-input input {
+  border-color: #d9dde3;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.light .global-chat-input input::placeholder {
+  color: #8a9099;
+}
+
+.light .global-chat-input input:focus {
+  border-color: #aeb4bd;
+  background: #ffffff;
+}
+
+.light .global-chat-input button {
+  background: #202328;
+  color: #ffffff;
+}
+
 </style>
 
 <style>
@@ -4172,6 +4302,136 @@ onUnmounted(() => {
   background: #9fa5ae;
   background-clip: padding-box;
 }
+
+/* ===== LIGHT THEME FIXES: controls that were still using dark-mode hardcoded colors ===== */
+.light .sidebar-bottom {
+  background: var(--panel);
+  border-top-color: #e6e8ed;
+}
+
+.light .new-chat {
+  border-color: #dfe3e7;
+  background: #ffffff;
+}
+
+.light .new-chat:hover {
+  border-color: #cfd4da;
+  background: #f3f4f6;
+}
+
+.light .new-chat kbd {
+  border-color: #d7dbe1;
+  background: #f1f3f5;
+  color: #656b74;
+  box-shadow: inset 0 -1px 0 rgba(20, 24, 30, .05);
+}
+
+.light .account {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.light .account-avatar {
+  border-color: #d9dde3;
+  background: #eef0f3;
+  color: #30343b;
+}
+
+.light .side-tool:hover,
+.light .logout:hover {
+  background: #f0f1f3;
+}
+
+.light .model-button {
+  border-color: #dde1e7;
+  background: #f3f4f6;
+  color: #454a54;
+}
+
+.light .model-button:hover {
+  border-color: #cfd4da;
+  background: #e9ecef;
+}
+
+.light .tool-button {
+  background: #f3f4f6;
+  color: #6f7680;
+}
+
+.light .tool-button:hover {
+  background: #e9ecef;
+  color: var(--text);
+}
+
+/* 共同聊天：外面的按鈕與裡面的面板都要跟著淺色主題切換 */
+.light .global-chat-toggle {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .97);
+  color: #25282e;
+  box-shadow: 0 10px 28px rgba(18, 25, 35, .12);
+}
+
+.light .global-chat-toggle:hover {
+  background: #f3f4f6;
+}
+
+.light .global-chat-toggle b {
+  background: #eceff2;
+  color: #454a54;
+}
+
+.light .global-chat-panel {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .985);
+  color: #1f2329;
+  box-shadow: 0 24px 70px rgba(18, 25, 35, .16);
+}
+
+.light .global-chat-head {
+  border-bottom-color: #e5e8ec;
+}
+
+.light .global-chat-message {
+  border-color: #e1e4e9;
+  background: #f6f7f9;
+  color: #23262c;
+}
+
+.light .global-chat-meta span,
+.light .global-chat-empty {
+  color: #737983;
+  opacity: 1;
+}
+
+.light .global-chat-error {
+  border-top-color: #e5e8ec;
+}
+
+.light .global-chat-input {
+  border-top-color: #e5e8ec;
+  background: #ffffff;
+}
+
+.light .global-chat-input input {
+  border-color: #d9dde3;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.light .global-chat-input input::placeholder {
+  color: #8a9099;
+}
+
+.light .global-chat-input input:focus {
+  border-color: #aeb4bd;
+  background: #ffffff;
+}
+
+.light .global-chat-input button {
+  background: #202328;
+  color: #ffffff;
+}
+
 </style>
 
 <style scoped>
@@ -4487,6 +4747,136 @@ onUnmounted(() => {
     bottom: calc(120px + env(safe-area-inset-bottom));
   }
 }
+
+/* ===== LIGHT THEME FIXES: controls that were still using dark-mode hardcoded colors ===== */
+.light .sidebar-bottom {
+  background: var(--panel);
+  border-top-color: #e6e8ed;
+}
+
+.light .new-chat {
+  border-color: #dfe3e7;
+  background: #ffffff;
+}
+
+.light .new-chat:hover {
+  border-color: #cfd4da;
+  background: #f3f4f6;
+}
+
+.light .new-chat kbd {
+  border-color: #d7dbe1;
+  background: #f1f3f5;
+  color: #656b74;
+  box-shadow: inset 0 -1px 0 rgba(20, 24, 30, .05);
+}
+
+.light .account {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.light .account-avatar {
+  border-color: #d9dde3;
+  background: #eef0f3;
+  color: #30343b;
+}
+
+.light .side-tool:hover,
+.light .logout:hover {
+  background: #f0f1f3;
+}
+
+.light .model-button {
+  border-color: #dde1e7;
+  background: #f3f4f6;
+  color: #454a54;
+}
+
+.light .model-button:hover {
+  border-color: #cfd4da;
+  background: #e9ecef;
+}
+
+.light .tool-button {
+  background: #f3f4f6;
+  color: #6f7680;
+}
+
+.light .tool-button:hover {
+  background: #e9ecef;
+  color: var(--text);
+}
+
+/* 共同聊天：外面的按鈕與裡面的面板都要跟著淺色主題切換 */
+.light .global-chat-toggle {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .97);
+  color: #25282e;
+  box-shadow: 0 10px 28px rgba(18, 25, 35, .12);
+}
+
+.light .global-chat-toggle:hover {
+  background: #f3f4f6;
+}
+
+.light .global-chat-toggle b {
+  background: #eceff2;
+  color: #454a54;
+}
+
+.light .global-chat-panel {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .985);
+  color: #1f2329;
+  box-shadow: 0 24px 70px rgba(18, 25, 35, .16);
+}
+
+.light .global-chat-head {
+  border-bottom-color: #e5e8ec;
+}
+
+.light .global-chat-message {
+  border-color: #e1e4e9;
+  background: #f6f7f9;
+  color: #23262c;
+}
+
+.light .global-chat-meta span,
+.light .global-chat-empty {
+  color: #737983;
+  opacity: 1;
+}
+
+.light .global-chat-error {
+  border-top-color: #e5e8ec;
+}
+
+.light .global-chat-input {
+  border-top-color: #e5e8ec;
+  background: #ffffff;
+}
+
+.light .global-chat-input input {
+  border-color: #d9dde3;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.light .global-chat-input input::placeholder {
+  color: #8a9099;
+}
+
+.light .global-chat-input input:focus {
+  border-color: #aeb4bd;
+  background: #ffffff;
+}
+
+.light .global-chat-input button {
+  background: #202328;
+  color: #ffffff;
+}
+
 </style>
 
 <!-- 前台質感強化：保留低彩度灰階，僅使用少量綠色提示狀態。 -->
@@ -4965,4 +5355,134 @@ onUnmounted(() => {
     transition-duration: .01ms !important;
   }
 }
+
+/* ===== LIGHT THEME FIXES: controls that were still using dark-mode hardcoded colors ===== */
+.light .sidebar-bottom {
+  background: var(--panel);
+  border-top-color: #e6e8ed;
+}
+
+.light .new-chat {
+  border-color: #dfe3e7;
+  background: #ffffff;
+}
+
+.light .new-chat:hover {
+  border-color: #cfd4da;
+  background: #f3f4f6;
+}
+
+.light .new-chat kbd {
+  border-color: #d7dbe1;
+  background: #f1f3f5;
+  color: #656b74;
+  box-shadow: inset 0 -1px 0 rgba(20, 24, 30, .05);
+}
+
+.light .account {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.light .account-avatar {
+  border-color: #d9dde3;
+  background: #eef0f3;
+  color: #30343b;
+}
+
+.light .side-tool:hover,
+.light .logout:hover {
+  background: #f0f1f3;
+}
+
+.light .model-button {
+  border-color: #dde1e7;
+  background: #f3f4f6;
+  color: #454a54;
+}
+
+.light .model-button:hover {
+  border-color: #cfd4da;
+  background: #e9ecef;
+}
+
+.light .tool-button {
+  background: #f3f4f6;
+  color: #6f7680;
+}
+
+.light .tool-button:hover {
+  background: #e9ecef;
+  color: var(--text);
+}
+
+/* 共同聊天：外面的按鈕與裡面的面板都要跟著淺色主題切換 */
+.light .global-chat-toggle {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .97);
+  color: #25282e;
+  box-shadow: 0 10px 28px rgba(18, 25, 35, .12);
+}
+
+.light .global-chat-toggle:hover {
+  background: #f3f4f6;
+}
+
+.light .global-chat-toggle b {
+  background: #eceff2;
+  color: #454a54;
+}
+
+.light .global-chat-panel {
+  border-color: #d9dde3;
+  background: rgba(255, 255, 255, .985);
+  color: #1f2329;
+  box-shadow: 0 24px 70px rgba(18, 25, 35, .16);
+}
+
+.light .global-chat-head {
+  border-bottom-color: #e5e8ec;
+}
+
+.light .global-chat-message {
+  border-color: #e1e4e9;
+  background: #f6f7f9;
+  color: #23262c;
+}
+
+.light .global-chat-meta span,
+.light .global-chat-empty {
+  color: #737983;
+  opacity: 1;
+}
+
+.light .global-chat-error {
+  border-top-color: #e5e8ec;
+}
+
+.light .global-chat-input {
+  border-top-color: #e5e8ec;
+  background: #ffffff;
+}
+
+.light .global-chat-input input {
+  border-color: #d9dde3;
+  background: #f7f8fa;
+  color: #1f2329;
+}
+
+.light .global-chat-input input::placeholder {
+  color: #8a9099;
+}
+
+.light .global-chat-input input:focus {
+  border-color: #aeb4bd;
+  background: #ffffff;
+}
+
+.light .global-chat-input button {
+  background: #202328;
+  color: #ffffff;
+}
+
 </style>
