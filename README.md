@@ -108,7 +108,7 @@ git clone https://github.com/USERNAME/ggpt-chat.git
 cd ggpt-chat
 ```
 
-###2. 使用 SQL 結構檔建立 MySQL 資料庫
+### 2. 使用 SQL 結構檔建立 MySQL 資料庫
 
 專案已在 database/schema.sql 提供完整資料庫結構，內容包含 chat_db 資料庫及網站所需的資料表、索引與關聯設定。
 
