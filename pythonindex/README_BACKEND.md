@@ -14,6 +14,7 @@
 | `audit.py` | 管理員操作紀錄 |
 | `traffic_routes.py` | 健康檢查與訪客紀錄 |
 | `auth_routes.py` | 註冊、登入、Google 登入與 Session |
+| `role_sessions.py` | 將使用者與管理員的 Cookie 隔離，避免登入和登出互相影響 |
 | `admin_routes.py` | 管理後台 API |
 | `upload_routes.py` | 圖片與附件上傳 |
 | `conversation_routes.py` | 對話、分享與訊息 API |
@@ -34,3 +35,13 @@ python app.py
 ```
 
 後端預設啟動於 `http://127.0.0.1:8080`。
+
+使用者工作階段使用 `ggpt_session`，管理員使用 `ggpt_admin_session`。更新後需重新啟動後端，管理員首次進入需重新登入；兩種身分的登入、登出及工作階段刷新互不影響。
+
+可選模型的費率集中於 `config.py`，新增 GPT-6 Luna、GPT-6 Sol、GPT-6.1 Sol，並移除 GPT-5 Nano。MySQL 的 `token_usage.model` 是歷史用量欄位，沒有獨立模型設定表；移除可選模型不會刪除歷史 Token 或費用紀錄。
+
+回歸檢查（不寫入 MySQL、不呼叫付費 OpenAI API）：
+
+```powershell
+python -m unittest discover -s tests -p test_backend.py -v
+```

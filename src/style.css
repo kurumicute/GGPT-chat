@@ -7,13 +7,44 @@ body,
 }
 
 body {
-  background: #212121;
+  background: #212224;
+  font-family: "Inter", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  --workspace-bg: #212224;
+  --workspace-panel: #18181b;
+  --workspace-surface: #27272a;
+  --workspace-control: #323236;
+  --workspace-line: #45454c;
+  --workspace-text: #f0f0f3;
+  --workspace-muted: #aaaab4;
+  --workspace-accent: #e0e0e5;
 }
 
 button,
 input,
 textarea {
   font: inherit;
+}
+
+button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #b8b8c2;
+  outline-offset: 3px;
+}
+::selection { background: #aaaabc55; }
+
+/* Both entry pages share the same visual language and responsive layout. */
+.auth-page, .login-shell {
+  font-family: "Inter", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * {

@@ -574,7 +574,7 @@ async function renderUsageChart() {
   if (usageChart) {
     try {
       usageChart.destroy()
-    } catch (_) {
+    } catch {
       // 已被 Chart.getChart(canvas) 清除時可忽略。
     }
     usageChart = null
@@ -595,10 +595,13 @@ async function renderUsageChart() {
         {
           label: '總金額',
           data: rows.map(item => item.total_cost),
-          backgroundColor: 'rgba(154,154,160,.72)',
-          borderColor: 'rgba(190,190,196,1)',
+          backgroundColor: 'rgba(170,170,182,.72)',
+          borderColor: 'rgba(204,204,214,1)',
           borderWidth: 1,
-          borderRadius: 7
+          borderRadius: { topLeft: 6, topRight: 6, bottomLeft: 0, bottomRight: 0 },
+          borderSkipped: 'bottom',
+          base: 0,
+          maxBarThickness: 64
         }
       ]
     },
@@ -606,6 +609,7 @@ async function renderUsageChart() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      animation: false,
       interaction: {
         mode: 'index',
         intersect: false
@@ -640,6 +644,8 @@ async function renderUsageChart() {
 
         y: {
           beginAtZero: true,
+          min: 0,
+          grace: '5%',
           ticks: {
             color: '#91919a',
             callback(value) {
@@ -703,10 +709,10 @@ async function renderTrafficChart() {
                 ),
 
               borderColor:
-                'rgba(184,184,190,1)',
+                'rgba(204,204,214,1)',
 
               backgroundColor:
-                'rgba(184,184,190,.08)',
+                'rgba(204,204,214,.08)',
 
               fill:
                 true,
@@ -732,10 +738,12 @@ async function renderTrafficChart() {
                 ),
 
               borderColor:
-                'rgba(99,219,184,1)',
+                'rgba(139,145,163,1)',
 
               backgroundColor:
-                'rgba(99,219,184,.07)',
+                'rgba(139,145,163,.07)',
+
+              borderDash: [5, 4],
 
               fill:
                 true,
@@ -2708,7 +2716,7 @@ onUnmounted(() => {
               </div>
 
               <div
-                v-else
+                v-if="!sortedFilteredUsers.length"
                 class="empty-state table-empty"
               >
                 <span>
@@ -3563,6 +3571,8 @@ onUnmounted(() => {
 
   </div>
 </template>
+
+
 
 <style scoped>
 :global(*) {
@@ -7278,3 +7288,5 @@ tbody tr:hover {
   }
 }
 </style>
+
+<style scoped src="../styles/admin-workspace.css"></style>

@@ -11,6 +11,7 @@ from flask import Blueprint, abort, current_app, jsonify, request, send_file
 from config import (
     CHAT_MAX_ATTACHMENTS,
     CHAT_MESSAGE_MAX_LENGTH,
+    DEFAULT_MODEL,
     MODEL_PRICING,
     OPENAI_API_KEY,
     OPENAI_MAX_OUTPUT_TOKENS,
@@ -140,7 +141,7 @@ def chat():
     if len(user_message) > CHAT_MESSAGE_MAX_LENGTH:
         return jsonify({"error": f"單次訊息最多 {CHAT_MESSAGE_MAX_LENGTH} 個字元。"}), 400
 
-    requested_model = (data.get("model") or os.getenv("OPENAI_MODEL") or "gpt-5.6-luna").strip()
+    requested_model = (data.get("model") or DEFAULT_MODEL).strip()
     if requested_model not in MODEL_PRICING:
         return jsonify({"error": f"不支援的模型：{requested_model}"}), 400
 
@@ -150,26 +151,23 @@ def chat():
     ).strip().lower()
 
     reasoning_capabilities = {
+        "gpt-6.1-sol": {"low", "medium", "high", "xhigh", "max"},
+        "gpt-6-sol": {"none", "low", "medium", "high", "xhigh", "max"},
+        "gpt-6-luna": {"none", "low", "medium", "high", "xhigh", "max"},
         "gpt-6-astra": {"low", "medium", "high", "xhigh", "max"},
         "gpt-5.6-sol": {"none", "low", "medium", "high", "xhigh", "max"},
         "gpt-5.6-terra": {"none", "low", "medium", "high", "xhigh", "max"},
         "gpt-5.6-luna": {"none", "low", "medium", "high", "xhigh", "max"},
     }
 
-    if requested_model == "gpt-5-nano":
-        # 依 UI 設計：GPT-5 nano 固定不使用思考模式。
-        reasoning_enabled = False
-        reasoning_effort = None
-    else:
-        allowed_efforts = reasoning_capabilities.get(requested_model)
-        reasoning_enabled = bool(
-            requested_reasoning_enabled and allowed_efforts
-        )
-        reasoning_effort = (
-            requested_reasoning_effort
-            if reasoning_enabled and requested_reasoning_effort in allowed_efforts
-            else ("medium" if reasoning_enabled and "medium" in allowed_efforts else None)
-        )
+    allowed_efforts = reasoning_capabilities[requested_model]
+    reasoning_enabled = requested_reasoning_enabled or "none" not in allowed_efforts
+    reasoning_effort = (
+        requested_reasoning_effort
+        if reasoning_enabled and requested_reasoning_effort in allowed_efforts
+        else ("medium" if reasoning_enabled else "none")
+    )
+    reasoning_enabled = reasoning_effort != "none"
 
     web_search_enabled = bool(data.get("web_search", False))
 
@@ -264,13 +262,9 @@ def chat():
             "max_output_tokens": OPENAI_MAX_OUTPUT_TOKENS,
         }
 
-        if reasoning_enabled and reasoning_effort:
-            response_kwargs["reasoning"] = {
-                "effort": reasoning_effort,
-                # OpenAI Responses API 現行欄位：
-                # generate_summary 已棄用，改用 summary。
-                "summary": "auto"
-            }
+        response_kwargs["reasoning"] = {"effort": reasoning_effort}
+        if reasoning_enabled:
+            response_kwargs["reasoning"]["summary"] = "auto"
 
         if web_search_enabled:
             response_kwargs["tools"] = [{"type": "web_search"}]

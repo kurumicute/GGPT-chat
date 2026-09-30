@@ -46,10 +46,20 @@ ADMIN_ACCOUNTS = os.getenv("ADMIN_ACCOUNTS", "")
 
 TOKEN_QUOTA = int(os.getenv("USER_TOKEN_QUOTA", "0") or 0)
 MODEL_PRICING = {
-    "gpt-5-nano": {
-        "input": float(os.getenv("OPENAI_PRICE_GPT_5_NANO_INPUT", "0.05")),
-        "cached_input": float(os.getenv("OPENAI_PRICE_GPT_5_NANO_CACHED_INPUT", "0.005")),
-        "output": float(os.getenv("OPENAI_PRICE_GPT_5_NANO_OUTPUT", "0.40")),
+    "gpt-6-luna": {
+        "input": float(os.getenv("OPENAI_PRICE_GPT_6_LUNA_INPUT", "0.10")),
+        "cached_input": float(os.getenv("OPENAI_PRICE_GPT_6_LUNA_CACHED_INPUT", "0.01")),
+        "output": float(os.getenv("OPENAI_PRICE_GPT_6_LUNA_OUTPUT", "0.50")),
+    },
+    "gpt-6-sol": {
+        "input": float(os.getenv("OPENAI_PRICE_GPT_6_SOL_INPUT", "2")),
+        "cached_input": float(os.getenv("OPENAI_PRICE_GPT_6_SOL_CACHED_INPUT", "0.20")),
+        "output": float(os.getenv("OPENAI_PRICE_GPT_6_SOL_OUTPUT", "10")),
+    },
+    "gpt-6.1-sol": {
+        "input": float(os.getenv("OPENAI_PRICE_GPT_6_1_SOL_INPUT", "2")),
+        "cached_input": float(os.getenv("OPENAI_PRICE_GPT_6_1_SOL_CACHED_INPUT", "0.10")),
+        "output": float(os.getenv("OPENAI_PRICE_GPT_6_1_SOL_OUTPUT", "10")),
     },
     "gpt-6-astra": {
         "input": float(os.getenv("OPENAI_PRICE_GPT_6_ASTRA_INPUT", "10")),
@@ -72,6 +82,11 @@ MODEL_PRICING = {
         "output": float(os.getenv("OPENAI_PRICE_GPT_5_6_LUNA_OUTPUT", "1.2")),
     },
 }
+
+
+DEFAULT_MODEL = os.getenv("OPENAI_MODEL", "gpt-6-luna").strip()
+if DEFAULT_MODEL not in MODEL_PRICING:
+    DEFAULT_MODEL = "gpt-6-luna"
 
 
 WEB_SEARCH_PRICE_PER_1K = float(os.getenv("OPENAI_WEB_SEARCH_PRICE_PER_1K", "10"))

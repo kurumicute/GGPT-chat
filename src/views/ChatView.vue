@@ -1,6 +1,7 @@
 <script setup>
 import { ref, shallowRef, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
+import { MODEL_OPTIONS, DEFAULT_MODEL, REASONING_MODELS, MODEL_REASONING_EFFORTS } from '../data/models'
 
 const router = useRouter()
 
@@ -79,10 +80,8 @@ const composerTextarea = ref(null)
 const waiting = ref(false)
 const thinkingLabel = ref('正在思考…')
 
-const model = ref(
-  localStorage.getItem('ggpt_selected_model_v2') ||
-  'gpt-5.6-luna'
-)
+const savedModel = localStorage.getItem('ggpt_selected_model_v2')
+const model = ref(MODEL_OPTIONS.some(item => item.id === savedModel) ? savedModel : DEFAULT_MODEL)
 
 const webSearchEnabled = ref(
   localStorage.getItem('ggpt_web_search_enabled_v1') === 'true'
@@ -96,19 +95,7 @@ const reasoningEffort = ref(
   localStorage.getItem('ggpt_reasoning_effort_v1') || 'medium'
 )
 
-const REASONING_MODELS = new Set([
-  'gpt-6-astra',
-  'gpt-5.6-sol',
-  'gpt-5.6-terra',
-  'gpt-5.6-luna'
-])
-
-const MODEL_REASONING_EFFORTS = {
-  'gpt-6-astra': ['low', 'medium', 'high', 'xhigh', 'max'],
-  'gpt-5.6-sol': ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
-  'gpt-5.6-terra': ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
-  'gpt-5.6-luna': ['none', 'low', 'medium', 'high', 'xhigh', 'max']
-}
+const reasoningRequired = computed(() => !availableReasoningEfforts().includes('none'))
 
 const modelPopoverOpen = ref(false)
 const sidebarOpen = ref(false)
@@ -166,34 +153,6 @@ const usageModal = ref(false)
 const googleEnabled = ref(false)
 const googleClientId = ref('')
 const googleReady = ref(false)
-
-const MODEL_OPTIONS = [
-  {
-    id: 'gpt-6-astra',
-    desc: '高階通用模型',
-    pricing: '$10 / $1 / $50'
-  },
-  {
-    id: 'gpt-5.6-sol',
-    desc: '通用對話模型',
-    pricing: '$4 / $0.40 / $20'
-  },
-  {
-    id: 'gpt-5.6-terra',
-    desc: '推理與程式能力模型',
-    pricing: '$2 / $0.20 / $12'
-  },
-  {
-    id: 'gpt-5.6-luna',
-    desc: '通用 AI 助手模型',
-    pricing: '$0.20 / $0.02 / $1.20'
-  },
-  {
-    id: 'gpt-5-nano',
-    desc: '超低成本、快速模型（不支援思考模式）',
-    pricing: '$0.05 / $0.005 / $0.40'
-  }
-]
 
 const currentConversation = computed(() =>
   conversations.value.find(
@@ -331,6 +290,8 @@ function normalizeReasoningPreference() {
   }
 
   const efforts = availableReasoningEfforts()
+  if (reasoningRequired.value) reasoningEnabled.value = true
+  if (reasoningEnabled.value && reasoningEffort.value === 'none') reasoningEffort.value = 'medium'
   if (!efforts.includes(reasoningEffort.value)) {
     reasoningEffort.value = efforts.includes('medium')
       ? 'medium'
@@ -346,6 +307,7 @@ function selectModel(id) {
 }
 
 function toggleReasoning() {
+  if (reasoningRequired.value) return
   if (!modelSupportsReasoning()) {
     reasoningEnabled.value = false
     return
@@ -359,12 +321,7 @@ function setReasoningEffort(value) {
   if (!modelSupportsReasoning()) return
   if (!availableReasoningEfforts().includes(value)) return
   reasoningEffort.value = value
-  reasoningEnabled.value = true
-  savePreferences()
-}
-
-function toggleWebSearch() {
-  webSearchEnabled.value = !webSearchEnabled.value
+  reasoningEnabled.value = value !== 'none'
   savePreferences()
 }
 
@@ -1634,6 +1591,7 @@ function formatFileSize(bytes) {
 async function loadGlobalChat() {
   if (authView.value) return
 
+  globalChatLoading.value = true
   try {
     const data =
       await api('/api/global_chat/messages')
@@ -1655,6 +1613,8 @@ async function loadGlobalChat() {
       'Global Chat 讀取失敗',
       error
     )
+  } finally {
+    globalChatLoading.value = false
   }
 }
 
@@ -1961,7 +1921,7 @@ function fallbackCopy(text) {
   area.style.opacity = '0'
   document.body.appendChild(area)
   area.select()
-  try { document.execCommand('copy') } catch {}
+  try { document.execCommand('copy') } catch { /* Browser may deny clipboard access. */ }
   area.remove()
 }
 
@@ -2124,6 +2084,8 @@ function loadGoogleSdk() {
 }
 
 onMounted(async () => {
+  normalizeReasoningPreference()
+  savePreferences()
   // 先完成 session 判斷；已登入使用者不再下載 Google SDK，避免浪費首屏網路與初始化時間。
   await checkSession()
   await nextTick()
@@ -2170,7 +2132,7 @@ onUnmounted(() => {
 
       <div class="auth-copy">
         <div class="eyebrow">YOUR AI WORKSPACE</div>
-        <h1>登入GGPT</h1>
+        <h1>登入 GGPT</h1>
         <p v-if="pendingShareToken" class="share-invite-notice">
           你正透過分享連結加入共同對話，登入後會自動開啟。
         </p>
@@ -2293,7 +2255,9 @@ onUnmounted(() => {
         </div>
 
         <div v-if="!filteredConversations.length" class="sidebar-empty">
-          沒有符合的對話
+          <span class="state-icon" aria-hidden="true">⌕</span>
+          <strong>沒有符合的對話</strong>
+          <small>換個關鍵字再試一次。</small>
         </div>
 
         <button
@@ -2615,6 +2579,29 @@ onUnmounted(() => {
                   <button @click="modelPopoverOpen = false">×</button>
                 </div>
 
+                <div class="model-options-grid" role="group" aria-label="選擇模型">
+                <button
+                  v-for="item in MODEL_OPTIONS"
+                  :key="item.id"
+                  class="model-option"
+                  :class="{ selected: model === item.id }"
+                  :aria-pressed="model === item.id"
+                  @click="selectModel(item.id)"
+                >
+                  <span class="option-check">{{ model === item.id ? '✓' : '' }}</span>
+                  <span>
+                    <strong>{{ item.label }}</strong>
+                    <small>{{ item.desc }}</small>
+                    <small v-if="item.pricing" class="model-option-pricing">
+                      {{ item.pricing }}
+                    </small>
+                  </span>
+                </button>
+                </div>
+                <p class="model-price-caption">USD／1M tokens · 輸入 / 快取 / 輸出</p>
+                <details class="model-settings">
+                  <summary>回應設定 <span>搜尋與思考強度</span></summary>
+                  <div class="model-toggles">
                 <label class="web-toggle">
                   <span>
                     <strong>Web Search</strong>
@@ -2625,25 +2612,24 @@ onUnmounted(() => {
 
                 <label
                   class="web-toggle reasoning-toggle"
-                  :class="{ disabled: !modelSupportsReasoning() }"
-                  :aria-disabled="!modelSupportsReasoning()"
+                  :class="{ disabled: reasoningRequired }"
+                  :aria-disabled="reasoningRequired"
                 >
                   <span>
                     <strong>思考模式</strong>
                     <small>
-                      {{ modelSupportsReasoning()
-                        ? `目前：${reasoningEnabled ? reasoningEffort : '關閉'}`
-                        : 'GPT-5 nano 不支援思考模式' }}
+                      {{ reasoningRequired ? '此模型固定啟用' : (reasoningEnabled ? '已開啟' : '已關閉') }}
                     </small>
                   </span>
                   <input
                     type="checkbox"
                     :checked="modelSupportsReasoning() && reasoningEnabled"
-                    :disabled="!modelSupportsReasoning()"
+                    :disabled="reasoningRequired"
                     @change="toggleReasoning"
                   />
                 </label>
 
+                  </div>
                 <div v-if="modelSupportsReasoning() && reasoningEnabled" class="reasoning-effort">
                   <div class="reasoning-effort-head">
                     <strong>思考強度</strong>
@@ -2651,7 +2637,7 @@ onUnmounted(() => {
                   </div>
                   <div class="reasoning-effort-buttons">
                     <button
-                      v-for="effort in availableReasoningEfforts()"
+                      v-for="effort in availableReasoningEfforts().filter(effort => effort !== 'none')"
                       :key="effort"
                       type="button"
                       :class="{ selected: reasoningEffort === effort }"
@@ -2662,22 +2648,7 @@ onUnmounted(() => {
                   </div>
                 </div>
 
-                <button
-                  v-for="item in MODEL_OPTIONS"
-                  :key="item.id"
-                  class="model-option"
-                  :class="{ selected: model === item.id }"
-                  @click="selectModel(item.id)"
-                >
-                  <span class="option-check">{{ model === item.id ? '✓' : '' }}</span>
-                  <span>
-                    <strong>{{ item.id }}</strong>
-                    <small>{{ item.desc }}</small>
-                    <small v-if="item.pricing" class="model-option-pricing">
-                      Input / Cached / Output：{{ item.pricing }} / 1M
-                    </small>
-                  </span>
-                </button>
+                </details>
               </div>
             </div>
 
@@ -2729,10 +2700,22 @@ onUnmounted(() => {
           </div>
 
           <div
-            v-if="!globalChatMessages.length"
-            class="global-chat-empty"
+            v-if="globalChatLoading && !globalChatMessages.length"
+            class="global-chat-state global-chat-loading"
+            role="status"
           >
-            還沒有訊息，來打第一句吧。
+            <span class="state-spinner" aria-hidden="true"></span>
+            <strong>正在載入共同聊天</strong>
+            <small>同步最新訊息中…</small>
+          </div>
+
+          <div
+            v-else-if="!globalChatMessages.length"
+            class="global-chat-state global-chat-empty"
+          >
+            <span class="state-icon" aria-hidden="true">◌</span>
+            <strong>還沒有訊息</strong>
+            <small>傳送第一句話開始共同聊天。</small>
           </div>
         </div>
 
@@ -2882,6 +2865,8 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+
 
 <style scoped>
 :global(*) { box-sizing: border-box; }
@@ -5486,3 +5471,309 @@ onUnmounted(() => {
 }
 
 </style>
+
+
+<style scoped>
+/* ===== UI CONSISTENCY PASS =====
+   Final override layer: shared theme tokens, consistent hover/focus/disabled,
+   polished loading/error/empty states, and small-screen ergonomics. */
+.app {
+  --ui-bg: #212224;
+  --ui-surface: #262628;
+  --ui-surface-2: #2b2b2e;
+  --ui-control: #303034;
+  --ui-hover: #39393d;
+  --ui-border: #48484d;
+  --ui-border-soft: rgba(255,255,255,.075);
+  --ui-focus: #8f939b;
+  --ui-danger: #f3a4aa;
+  --ui-danger-bg: rgba(239,68,68,.09);
+  --ui-danger-border: rgba(239,68,68,.24);
+  --ui-shadow: 0 16px 44px rgba(0,0,0,.20);
+}
+.app.light {
+  --ui-bg: #f7f8fa;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #f7f8fa;
+  --ui-control: #f3f4f6;
+  --ui-hover: #e9ecef;
+  --ui-border: #d9dde3;
+  --ui-border-soft: rgba(20,24,30,.09);
+  --ui-focus: #7b838d;
+  --ui-danger: #a33d47;
+  --ui-danger-bg: #fff1f2;
+  --ui-danger-border: #f2c8cd;
+  --ui-shadow: 0 16px 44px rgba(18,25,35,.10);
+}
+
+/* Base interactive rhythm */
+.new-chat,
+.side-tool,
+.logout,
+.mobile-button,
+.icon-button,
+.conversation-button,
+.conversation-menu,
+.history-load-more,
+.suggestions button,
+.message-tools button,
+.tool-button,
+.model-button,
+.model-option,
+.reasoning-effort-buttons button,
+.send-button,
+.global-chat-toggle,
+.global-chat-head button,
+.global-chat-input button,
+.modal-header button,
+.revoke-share-button,
+.primary,
+.secondary {
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease,
+              box-shadow .16s ease, transform .14s ease, opacity .14s ease;
+}
+
+/* One accessible focus treatment everywhere */
+.app :is(button, input, textarea, a):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+.app :is(.conversation-search, .composer, .auth-field):focus-within {
+  border-color: var(--ui-focus) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ui-focus) 18%, transparent);
+}
+.app :is(button, input, textarea):disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+/* Light mode hover consistency */
+.light .side-tool:hover,
+.light .logout:hover,
+.light .icon-button:hover,
+.light .mobile-button:hover,
+.light .conversation-menu:hover,
+.light .history-load-more:hover,
+.light .message-tools button:hover,
+.light .model-option:hover,
+.light .reasoning-summary-toggle:hover,
+.light .global-chat-head button:hover,
+.light .modal-header button:hover {
+  background: var(--ui-hover);
+  color: var(--text);
+}
+.light .suggestions button:hover {
+  border-color: #cfd4da;
+  background: #f5f6f8;
+}
+.light .conversation-row:hover:not(.active) { background:#f1f3f5; }
+.light .conversation-row.active { background:#e9ecef; }
+.light .conversation-menu { color:#747b85; }
+.light .conversation-menu:hover { color:#24272d; }
+
+/* Composer and controls use the same surface family */
+.light .composer {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+}
+.light .composer:focus-within {
+  border-color: var(--ui-focus) !important;
+  box-shadow: 0 0 0 3px rgba(90,99,110,.10), var(--ui-shadow);
+}
+.light .model-button,
+.light .tool-button {
+  border-color: transparent;
+  background: var(--ui-control);
+}
+.light .model-button:hover,
+.light .tool-button:hover { background:var(--ui-hover); }
+.light .model-popover,
+.light .share-dialog,
+.light .usage-dialog {
+  border-color: var(--ui-border);
+  background: var(--ui-surface);
+  box-shadow: 0 24px 70px rgba(18,25,35,.14);
+}
+
+/* Sidebar bottom / account */
+.light .sidebar-bottom { background:#fff; }
+.light .account {
+  border:1px solid #e2e5e9;
+  background:#f8f9fb;
+  padding:8px;
+}
+.light .account:hover { background:#f3f4f6; }
+.logout {
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  border-radius:8px;
+}
+
+/* Polished state components */
+.sidebar-empty,
+.global-chat-state,
+.model-usage-empty {
+  color:var(--muted);
+}
+.sidebar-empty {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:5px;
+  margin:10px 4px;
+  padding:22px 12px;
+  border:1px dashed var(--ui-border-soft);
+  border-radius:11px;
+  background:rgba(127,127,127,.035);
+}
+.sidebar-empty strong,
+.global-chat-state strong { color:var(--text); font-size:12px; }
+.sidebar-empty small,
+.global-chat-state small { color:var(--muted); font-size:11px; line-height:1.45; }
+.state-icon {
+  width:32px;
+  height:32px;
+  display:grid;
+  place-items:center;
+  margin-bottom:3px;
+  border:1px solid var(--ui-border-soft);
+  border-radius:9px;
+  background:rgba(127,127,127,.08);
+  color:var(--muted);
+}
+.global-chat-state {
+  min-height:180px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:30px 16px;
+  text-align:center;
+  opacity:1;
+}
+.state-spinner {
+  width:26px;
+  height:26px;
+  margin-bottom:8px;
+  border:2px solid rgba(127,127,127,.22);
+  border-top-color:var(--text);
+  border-radius:50%;
+  animation:ui-state-spin .8s linear infinite;
+}
+@keyframes ui-state-spin { to { transform:rotate(360deg); } }
+
+/* Error treatment is readable in both themes */
+.error-message,
+.global-chat-error {
+  border-color:var(--ui-danger-border) !important;
+  background:var(--ui-danger-bg);
+  color:var(--ui-danger);
+}
+.global-chat-error {
+  margin:0 10px 8px;
+  border:1px solid var(--ui-danger-border);
+  border-radius:9px;
+  line-height:1.45;
+}
+
+/* Global chat */
+.light .global-chat-toggle,
+.light .global-chat-panel {
+  border-color:var(--ui-border);
+  background:rgba(255,255,255,.985);
+  color:var(--text);
+}
+.light .global-chat-toggle:hover { background:#f3f4f6; }
+.light .global-chat-message {
+  border-color:#e3e6ea;
+  background:#f6f7f9;
+}
+.light .global-chat-input {
+  border-top-color:#e5e8ec;
+  background:#fff;
+}
+.light .global-chat-input input {
+  border-color:var(--ui-border);
+  background:#f7f8fa;
+  color:var(--text);
+}
+.light .global-chat-input input:focus {
+  outline:0;
+  border-color:var(--ui-focus);
+  background:#fff;
+  box-shadow:0 0 0 3px rgba(90,99,110,.10);
+}
+.global-chat-input button:not(:disabled):hover { transform:translateY(-1px); }
+
+/* Modal polish */
+.modal { backdrop-filter:blur(4px); }
+.light .usage-stat,
+.light .model-usage-row,
+.light .model-pricing-row,
+.light .model-usage-empty {
+  border-color:#e3e6ea;
+  background:#f8f9fb;
+}
+.model-usage-empty {
+  border:1px dashed var(--ui-border-soft);
+  text-align:center;
+}
+
+/* Upload/drag state follows theme */
+.composer-area.is-dragging::before {
+  color:#f3f4f6;
+  background:rgba(31,33,37,.92);
+}
+.light .composer-area.is-dragging::before {
+  color:#25282e;
+  border-color:#9aa1aa;
+  background:rgba(247,248,250,.94);
+}
+.light .pending-file,
+.light .message-file { background:#f1f3f5; }
+.light .message-file:hover { background:#e8ebef; }
+
+/* Mobile: keep controls tappable and prevent composer collisions */
+@media (max-width:720px), (pointer:coarse) {
+  .app :is(button, .global-chat-toggle) { min-height:40px; }
+  .conversation-button { min-height:44px; height:44px; }
+  .conversation-menu { width:40px; height:40px; opacity:1; }
+  .topbar { min-height:56px; }
+  .composer-area { padding-left:10px; padding-right:10px; }
+  .composer { gap:6px; }
+  .composer textarea { min-height:44px; }
+  .tool-button,
+  .send-button { min-width:42px; min-height:42px; }
+  .model-button { min-height:42px; }
+  .global-chat-toggle { min-height:44px; }
+}
+
+@media (max-width:620px) {
+  .top-actions { gap:2px; }
+  .icon-button { width:40px; height:40px; }
+  .chat-title strong { max-width:min(46vw, 210px); }
+  .welcome { padding-top:18px; padding-bottom:18px; }
+  .welcome p { line-height:1.65; }
+  .suggestions { gap:8px; }
+  .suggestions button { min-height:72px; }
+  .composer-meta { padding-inline:4px; }
+  .global-chat-panel { border-radius:14px; }
+}
+
+@media (max-width:420px) {
+  .chat-box { padding-left:10px; padding-right:10px; }
+  .composer { padding-left:8px; padding-right:8px; }
+  .model-button { max-width:112px; }
+  .global-chat-panel { left:6px; right:6px; }
+}
+
+@media (prefers-reduced-motion:reduce) {
+  .state-spinner { animation-duration:1.4s; }
+}
+</style>
+
+<style scoped src="../styles/chat-workspace.css"></style>

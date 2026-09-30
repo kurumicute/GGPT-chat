@@ -31,6 +31,7 @@ from traffic_routes import bp as traffic_bp
 from upload_routes import bp as uploads_bp
 from extensions import limiter
 from security import apply_security_headers, protect_cross_site_request
+from role_sessions import RoleSessionInterface
 
 
 def create_app():
@@ -43,6 +44,7 @@ def create_app():
             x_host=TRUST_PROXY_COUNT,
         )
     app.secret_key = FLASK_SECRET_KEY
+    app.session_interface = RoleSessionInterface()
     app.config.update(
         SESSION_COOKIE_NAME="ggpt_session",
         SESSION_COOKIE_HTTPONLY=True,
